@@ -12,17 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-order_distribute Publisher
+order_distribute Subscriber
 """
-from threading import Condition
+import signal
 import time
-
+from threading import Condition
 import fastdds
 import order_distribute
 
-DESCRIPTION = """OrderDistribute Publisher example for Fast DDS python bindings"""
-USAGE = ('python3 order_distributePublisher.py')
-summessage = 0
+DESCRIPTION = """OrderDistribute Subscriber example for Fast DDS python bindings"""
+USAGE = ('python3 order_distributeSubscriber.py')
+count_rev = 0
+
+
+# To capture ctrl+C
+def signal_handler(sig, frame):
+    print('Interrupted!')
 
 
 class WriterListener (fastdds.DataWriterListener) :
@@ -45,7 +50,6 @@ class WriterListener (fastdds.DataWriterListener) :
             self._writer._cvDiscovery.release()
 
 
-
 class ReaderListener(fastdds.DataReaderListener):
 
 
@@ -66,18 +70,17 @@ class ReaderListener(fastdds.DataReaderListener):
         reader.take_next_sample(data, info)
 
         print("Received {message} : {index}".format(message=data.message(), index=data.index()))
-        global summessage
-        summessage = summessage + 1
+        global count_rev
+        count_rev = count_rev + 1
 
 
-
-class Writer:
+class Reader:
 
 
     def __init__(self):
-        self._matched_reader = 0
         self._cvDiscovery = Condition()
-        self.index = 0
+        self._matched_reader = 0
+        self.index = 100
 
         factory = fastdds.DomainParticipantFactory.get_instance()
         self.participant_qos = fastdds.DomainParticipantQos()
@@ -91,36 +94,41 @@ class Writer:
 
         self.topic_qos = fastdds.TopicQos()
         self.participant.get_default_topic_qos(self.topic_qos)
-        self.Writer_topic = self.participant.create_topic("OrderDistributeTopic_xie2", self.topic_data_type.getName(), self.topic_qos)
-        self.Reader_topic = self.participant.create_topic("OrderDistributeTopic_xie_collection", self.topic_data_type.getName(),
+        self.Reader_topic = self.participant.create_topic("OrderDistributeTopic_xie2", self.topic_data_type.getName(), self.topic_qos)
+        self.Writer_topic = self.participant.create_topic("OrderDistributeTopic_xie_collection",
+                                                          self.topic_data_type.getName(),
                                                           self.topic_qos)
-
-        self.publisher_qos = fastdds.PublisherQos()
-        self.participant.get_default_publisher_qos(self.publisher_qos)
-        self.publisher = self.participant.create_publisher(self.publisher_qos)
 
         self.subscriber_qos = fastdds.SubscriberQos()
         self.participant.get_default_subscriber_qos(self.subscriber_qos)
         self.subscriber = self.participant.create_subscriber(self.subscriber_qos)
 
-        self.writer_listener = WriterListener(self)
-        self.writer_qos = fastdds.DataWriterQos()
-        self.publisher.get_default_datawriter_qos(self.writer_qos)
-        self.writer = self.publisher.create_datawriter(self.Writer_topic, self.writer_qos, self.writer_listener)
+        self.publisher_qos = fastdds.PublisherQos()
+        self.participant.get_default_publisher_qos(self.publisher_qos)
+        self.publisher = self.participant.create_publisher(self.publisher_qos)
 
         self.Reader_listener = ReaderListener()
         self.reader_qos = fastdds.DataReaderQos()
         self.subscriber.get_default_datareader_qos(self.reader_qos)
         self.reader = self.subscriber.create_datareader(self.Reader_topic, self.reader_qos, self.Reader_listener)
 
+        self.writer_listener = WriterListener(self)
+        self.writer_qos = fastdds.DataWriterQos()
+        self.publisher.get_default_datawriter_qos(self.writer_qos)
+        self.writer = self.publisher.create_datawriter(self.Writer_topic, self.writer_qos, self.writer_listener)
+
+    def delete(self):
+        factory = fastdds.DomainParticipantFactory.get_instance()
+        self.participant.delete_contained_entities()
+        factory.delete_participant(self.participant)
+
     def write(self):
         data = order_distribute.OrderDistribute()
-        data.message("please start the mission")
+        data.message("I complete the mission")
         data.index(self.index)
         self.writer.write(data)
         print("Sending {message} : {index}".format(message=data.message(), index=data.index()))
         self.index = self.index + 1
-
 
     def wait_discovery(self) :
         self._cvDiscovery.acquire()
@@ -129,28 +137,21 @@ class Writer:
         self._cvDiscovery.release()
         print("Writer discovery finished...")
 
-
     def run(self):
+        #
+        # signal.signal(signal.SIGINT, signal_handler)
+        # print('Press Ctrl+C to stop')
+        # signal.pause()
+        while count_rev <= 9:
+            print("counting the count_rev:", count_rev)
+            time.sleep(1)
         self.wait_discovery()
-        for x in range(10) :
-            time.sleep(1)
-            self.write()
-        global summessage
-        while summessage <= 0:
-            time.sleep(1)
-            print(summessage)
-
+        self.write()
         self.delete()
 
 
-    def delete(self):
-        factory = fastdds.DomainParticipantFactory.get_instance()
-        self.participant.delete_contained_entities()
-        factory.delete_participant(self.participant)
-
-
 if __name__ == '__main__':
-    print('Starting publisher.')
-    writer = Writer()
-    writer.run()
+    print('Creating subscriber.')
+    reader = Reader()
+    reader.run()
     exit()
