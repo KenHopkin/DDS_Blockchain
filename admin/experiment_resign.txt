@@ -1,0 +1,2 @@
+delete device number 2, cost time:0:00:09.296312秒 
+each is 0:00:04.648156
