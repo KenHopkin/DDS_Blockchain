@@ -183,6 +183,35 @@ class Node(object):
             except ValueError:
                 raise
 
+    def device_resign(self, index, nodeindex):
+        self.w3.geth.personal.unlock_account(self.w3.eth.accounts[nodeindex], "123456")
+        device_sig = Web3.toHex(
+            self.w3.eth.sign(self.w3.eth.accounts[nodeindex], self.contract.functions.GetAssociationHash(
+                self.cert[index].domain_id, self.cert[index].device_id, self.cert[index].device_addr,
+                self.cert[index].sig).call()))
+
+        self.w3.geth.personal.unlock_account(self.w3.eth.accounts[nodeindex], "123456")
+
+        tx_hash = self.contract.functions.DetouchPhase(self.cert[index].domain_id, self.cert[index].device_id,
+                                                           self.cert[index].device_addr, self.cert[index].sig,
+                                                           device_sig) \
+            .transact({'from': self.w3.eth.accounts[nodeindex]})
+        # self.w3.geth.miner.start(2)
+        tx_receipt = self.w3.eth.waitForTransactionReceipt(tx_hash)
+        # self.w3.geth.miner.stop()
+
+        res_used, res_id, res_addr, _, _, _ = self.contract.functions.ViewDeviceByID(self.cert[index].domain_id,
+                                                                                     self.cert[index].device_id).call()
+        if not (res_used and res_id == self.cert[index].device_id and res_addr == self.cert[index].device_addr):
+            # self.domain_ass.append(self.cert[index].domain_id)
+            # self.update_heartbeat()
+            return "the device:" + res_id + " at " + res_addr + " is resigned successfully!"
+        else:
+            try:
+                raise ValueError("the device:", res_id, "at", res_addr, "is resigned failure!")
+            except ValueError:
+                raise
+
     def device_au(self, nodeindex, domain_id, device_id, device_data):
         """
         在自身已加入的信任域（domain_id）内，对无人艇（device_id）发送数据（device_data）
