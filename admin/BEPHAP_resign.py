@@ -103,8 +103,95 @@ def init_servers_web3(ass_group, ass_leftind, ass_rightind):
             dev_grp[-1].node_idx = dev_id.index(nodeid)
         servers_dev.append(dev_grp)
 
+def resign_multi_dev(ass_group, ass_leftind, ass_rightind):
+    # 用HTTP连接三个节点
+    w3 = Web3(Web3.HTTPProvider(dev_ip))
+
+
+    nodeIDs = dev_id[ass_leftind:(ass_rightind+1)]
+    task_id = ass_group
+
+    # tmp_addr = '0xcdeDD3D2c582A1b961F211483ee3EebF612763d3'
+    authensc = w3.eth.contract(address=Web3.toChecksumAddress(authensc_addr),
+                               abi=abi_a)
+    masteraddr = authensc.functions.DomainInfo(ass_group).call()[1]
+    master_id = dev_id[w3.eth.accounts.index(masteraddr)]
+
+    device.append(
+        node_module.Node(Web3(Web3.HTTPProvider(dev_ip)), authensc, master_id,
+                         w3.eth.accounts[dev_id.index(master_id)]))
+    device[-1].node_idx = dev_id.index(master_id)
+
+    for nodeid in nodeIDs:
+        device.append(
+            node_module.Node(Web3(Web3.HTTPProvider(dev_ip)), authensc, nodeid, w3.eth.accounts[dev_id.index(nodeid)]))
+        device[-1].node_idx = dev_id.index(nodeid)
+
+    # device[0].mas_rst_contract2(w3.eth.accounts[dev_id.index(master_id)])
+
+    # sign cert
+    for i in range(len(nodeIDs)):
+        device[0].mas_create_other_cert(device[i + 1], task_id)
+
+    # time_start = datetime.datetime.now()
+    # print(device[0].mas_build_domain(master_id, task_id))
+    # time_build_domain = datetime.datetime.now()
+    # print("创建信任域所需时间：", (time_build_domain - time_start), "秒")
+
+    for i in range(len(nodeIDs)):
+        time_add_device1 = datetime.datetime.now()
+        print(device[i + 1].device_resign(0, dev_id.index(nodeIDs[i])))
+        time_add_device2 = datetime.datetime.now()
+        print(dev_id[i] + "车辆退出信任域所需时间：", (time_add_device2 - time_add_device1), "秒")
+
+
+def servers_check_resign(ass_group, ass_leftind, ass_rightind):
+
+
+    nodeIDs = dev_id[ass_leftind:(ass_rightind + 1)]
+    onchaindev = []
+    lossdev = []
+    range_servers = list(range(len(w3s)))
+    tmp_range = copy.deepcopy(range_servers)
+
+    while len(range_servers) > 0:
+        print("range_servers: ", range_servers)
+        for i in range_servers:
+            onchaindev.clear()
+            lossdev.clear()
+            for each in servers_dev[i]:
+                curr_dm = each.dev_dm_iterate_start()
+                while each.dev_dm_can_iterate(curr_dm):
+                    onchaindev.append((curr_dm, each.id))
+                    # print(curr_dm, each.id, device[i].query_lgtlttwh(curr_dm, each.id))
+                    curr_dm = each.dev_dm_iterate_next(curr_dm)
+            for nodeid in nodeIDs:
+                if (ass_group, nodeid) in onchaindev:
+                    lossdev.append(nodeid)
+            if len(lossdev) == 0:
+                print(i, ": all device are resigned from chain ")
+                tmp_range.remove(i)
+            else:
+                print(i, ": loss devices:", lossdev)
+        range_servers = copy.deepcopy(tmp_range)
+
+
 if __name__ == "__main__":
     ass_grp = "thefirsttest"
-    start_dev = 27
-    end_dev = 27  # included
+    start_dev = 8
+    end_dev = 9  # included
     init_servers_web3(ass_grp, start_dev, end_dev)
+
+    w3s[0].geth.miner.start(2)
+    time_add_device1 = datetime.datetime.now()
+    resign_multi_dev(ass_grp, start_dev, end_dev)
+    servers_check_resign(ass_grp, start_dev, end_dev)
+    time_add_device2 = datetime.datetime.now()
+    w3s[0].geth.miner.stop()
+
+    result_str = "delete device number " + str(end_dev - start_dev + 1) + ", cost time:" \
+                 + str(time_add_device2 - time_add_device1) + "秒 \n" + "each is " \
+                 + str((time_add_device2 - time_add_device1) / (end_dev - start_dev + 1)) + "\n"
+    print("delete device number ", end_dev - start_dev + 1, ", cost time:", (time_add_device2 - time_add_device1), "秒")
+    with open("experiment_resign.txt", 'a+') as resign_result:
+        resign_result.write(result_str)
