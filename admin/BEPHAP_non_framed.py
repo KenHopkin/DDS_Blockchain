@@ -103,7 +103,7 @@ def init_servers_web3(ass_group, ass_leftind, ass_rightind):
             dev_grp[-1].node_idx = dev_id.index(nodeid)
         servers_dev.append(dev_grp)
 
-def resign_multi_dev(ass_group, ass_leftind, ass_rightind):
+def test_support_non_frame(ass_group, ass_leftind, ass_rightind, test_number):
     # 用HTTP连接三个节点
     w3 = Web3(Web3.HTTPProvider(dev_ip))
 
@@ -133,16 +133,32 @@ def resign_multi_dev(ass_group, ass_leftind, ass_rightind):
     for i in range(len(nodeIDs)):
         device[0].mas_create_other_cert(device[i + 1], task_id)
 
+    index = 0
+
+
+    time1 = datetime.datetime.now()
+    for i in range(test_number):
+        device[0].contract.functions.ViewDeviceByID(device[1].cert[index].domain_id,
+                                             device[1].cert[index].device_id).call()
+    time2 = datetime.datetime.now()
+
+    result_str = "test number " + str(test_number) + ", cost time:" \
+                 + str(time2 - time1) + "秒 \n" + "each is " \
+                 + str((time2 - time1) / test_number) + "\n"
+    # print("delete device number ", end_dev - start_dev + 1, ", cost time:", (time_add_device2 - time_add_device1), "秒")
+    with open("experiment_non_frame.txt", 'a+') as resign_result:
+        resign_result.write(result_str)
+
     # time_start = datetime.datetime.now()
     # print(device[0].mas_build_domain(master_id, task_id))
     # time_build_domain = datetime.datetime.now()
     # print("创建信任域所需时间：", (time_build_domain - time_start), "秒")
 
-    for i in range(len(nodeIDs)):
-        time_add_device1 = datetime.datetime.now()
-        print(device[i + 1].device_resign(0, dev_id.index(nodeIDs[i])))
-        time_add_device2 = datetime.datetime.now()
-        print(dev_id[i] + "车辆退出信任域所需时间：", (time_add_device2 - time_add_device1), "秒")
+    # for i in range(len(nodeIDs)):
+    #     time_add_device1 = datetime.datetime.now()
+    #     print(device[i + 1].device_resign(0, dev_id.index(nodeIDs[i])))
+    #     time_add_device2 = datetime.datetime.now()
+    #     print(dev_id[i] + "车辆退出信任域所需时间：", (time_add_device2 - time_add_device1), "秒")
 
 
 def servers_check_resign(ass_group, ass_leftind, ass_rightind):
@@ -178,20 +194,8 @@ def servers_check_resign(ass_group, ass_leftind, ass_rightind):
 
 if __name__ == "__main__":
     ass_grp = "thefirsttest"
-    start_dev = 50
-    end_dev = 99  # included
+    start_dev = 16
+    end_dev = 17  # included
     init_servers_web3(ass_grp, start_dev, end_dev)
+    test_support_non_frame(ass_grp, start_dev, end_dev, 10000)
 
-    w3s[0].geth.miner.start(2)
-    time_add_device1 = datetime.datetime.now()
-    resign_multi_dev(ass_grp, start_dev, end_dev)
-    servers_check_resign(ass_grp, start_dev, end_dev)
-    time_add_device2 = datetime.datetime.now()
-    w3s[0].geth.miner.stop()
-
-    result_str = "delete device number " + str(end_dev - start_dev + 1) + ", cost time:" \
-                 + str(time_add_device2 - time_add_device1) + "秒 \n" + "each is " \
-                 + str((time_add_device2 - time_add_device1) / (end_dev - start_dev + 1)) + "\n"
-    print("delete device number ", end_dev - start_dev + 1, ", cost time:", (time_add_device2 - time_add_device1), "秒")
-    with open("experiment_resign.txt", 'a+') as resign_result:
-        resign_result.write(result_str)

@@ -266,8 +266,8 @@ if __name__ == "__main__":
     # check_associate("thefirsttest",7,16)
     # init_servers_web3("thefirsttest",7,16)
     ass_grp = "thefirsttest"
-    start_dev = 27
-    end_dev = 30  # included
+    start_dev = 81
+    end_dev = 130  # included
     init_servers_web3(ass_grp, start_dev, end_dev)
     w3s[0].geth.miner.start(2)
     time_add_device1 = datetime.datetime.now()
